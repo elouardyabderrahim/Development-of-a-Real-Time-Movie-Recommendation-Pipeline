@@ -1,9 +1,13 @@
+from kafka import KafkaProducer
+import json
 import requests
-import csv
+from config import KEY_API_bd  # Import API key from config
 
-API_KEY = 'ef9921191c448632e53ff5ee5e5501d9'
+API_KEY = KEY_API_bd
 BASE_URL = "https://api.themoviedb.org/3/movie/popular"
 LANGUAGE = "en-US"
+KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
+KAFKA_TOPIC = 'movie_data_topic'
 
 def fetch_movie_data(page):
     MOVIE_ENDPOINT = f"{BASE_URL}?api_key={API_KEY}&language={LANGUAGE}&page={page}"
@@ -16,29 +20,25 @@ def fetch_movie_data(page):
         return []
 
 # Number of pages you want to retrieve
-num_pages = 5
+num_pages = 100
 all_movie_data = []
 
 for page_number in range(1, num_pages + 1):
     movie_data = fetch_movie_data(page_number)
     all_movie_data.extend(movie_data)
 
-# Extract all possible headers dynamically
-all_headers = set()
+# Create Kafka producer instance
+producer = KafkaProducer(
+    bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+# Produce messages to Kafka topic
 for movie in all_movie_data:
-    all_headers.update(movie.keys())
+    # Produce the message to the Kafka topic
+    producer.send(KAFKA_TOPIC, key=str(movie['id']), value=movie)
 
-# Save the data to a CSV file
-csv_filename = 'movie_data.csv'
+# Close the producer
+producer.close()
 
-with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
-    writer = csv.DictWriter(csvfile, fieldnames=list(all_headers))
-    
-    # Write the header
-    writer.writeheader()
-    
-    # Write the data
-    for movie in all_movie_data:
-        writer.writerow(movie)
-
-print(f"Data for {num_pages} pages has been successfully retrieved and stored in {csv_filename}.")
+print(f"Data for {num_pages} pages has been successfully sent to Kafka topic {KAFKA_TOPIC}.")
