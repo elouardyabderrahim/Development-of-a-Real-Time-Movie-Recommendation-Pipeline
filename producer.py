@@ -31,6 +31,7 @@ try:
         
         for movie in movie_data:
             producer.send(KAFKA_TOPIC, key=movie['id'], value=movie)
+            print("movies: ",movie)
 
         page_number += 1
         time.sleep(2)  
